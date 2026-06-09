@@ -33,7 +33,7 @@ These are carried forward from the established project working agreement. Apply 
 **Do these in order before generating anything. This is Discipline D applied to project bootstrap.**
 
 1. **Inspect the live instance & existing code.** The production Odoo instance is at `https://southbrookcabinetry.space`. The existing addons must be read from disk in the repository / Odoo addons path before you touch them. Identify and read the manifest, models, and tests of:
-   - `southbrook_estimating` — **already deployed: 16 commits, ~6,300 lines, 95 test methods, 27 Q/NF decision identifiers.** It owns attribute configuration, variant creation, pricelists, cabinet templates, geometric conventions, and the **7-routine boundary** (do not exceed 7 custom routines in this addon).
+   - `southbrook_estimating` — **already deployed.** As of 2026-06-09 inspection: 11 models, 14 test files, **101 test methods** (manifest description still reads "95" — code grew past it), 27 Q/NF decision identifiers. It owns attribute configuration, variant creation, pricelists, cabinet templates, geometric conventions, and the **7-routine boundary** (do not exceed 7 custom routines in this addon — the authoritative register is `docs/SAMI_Southbrook_Odoo19_Build_Spec.md §4`).
    - Any in-progress `southbrook_customer_portal` work (Phase 1.6 OWL + JSON-RPC `/my/order-builder`).
    - The OCA `product_configurator` trio (`product_configurator`, `_sale`, `_mrp`) and `website_product_configurator` as currently vendored.
 
@@ -67,23 +67,32 @@ These are carried forward from the established project working agreement. Apply 
 Generate this monorepo layout. Create directories lazily as each module is built, not all upfront.
 
 ```
-southbrook-platform/
-├── CLAUDE.md                          # this file
-├── docker-compose.yml                 # Odoo + Postgres + FreeCAD Bridge
-├── .env.example                       # secrets template (never commit real secrets)
+southbrook-v19cr/                       # actual monorepo root (root name updated 2026-06-09 to match disk; was "southbrook-platform/" in pre-2026-06-09 doc)
+├── CLAUDE.md                          # in-repo co-development brief (separate from THIS init doc)
+├── AGENTS.md                          # agent-onboarding brief
+├── PUNCHLIST.md                       # locked decisions + active worklist
 ├── README.md
+├── docker-compose.yml                 # NEW at Module 0 — Odoo + Postgres + FreeCAD Bridge
+├── .env.example                       # NEW at Module 0 — secrets template (never commit real secrets)
 │
 ├── addons/                            # Odoo CE addons
-│   ├── southbrook_estimating/         # EXISTS — review only, extend via _inherit
-│   ├── southbrook_plm/                # Module 1
-│   ├── southbrook_freecad_bridge/     # Module 2 (Odoo side of the bridge)
-│   ├── southbrook_hardware_catalog/   # Module 3
-│   ├── southbrook_kitchen_mrp/        # Module 4 (sb.cutlist, sb.hardware.package)
-│   ├── southbrook_kitchen_workspace/  # Module 5 (sb.kitchen.project ...)
-│   ├── southbrook_ai_design/          # Module 6 (Gemini caller, JSON contract)
-│   ├── southbrook_config_engine/      # Module 7 (cabinet placement rules engine)
-│   ├── southbrook_customer_portal/    # Module 8 (extends Phase 1.6 portal)
-│   └── southbrook_dealer_portal/      # Module 9 (dealer 50% pricing, KD program)
+│   ├── product_configurator/          # OCA, vendored
+│   ├── product_configurator_mrp/      # OCA, vendored
+│   ├── product_configurator_sale/     # OCA, vendored
+│   ├── website_product_configurator/  # OCA, vendored
+│   ├── southbrook_estimating/         # EXISTS — review only, extend via _inherit (~101 test methods as of 2026-06-09)
+│   ├── southbrook_estimating_website/ # EXISTS — 3D-launch website surface (pre-Module 0 work)
+│   ├── southbrook_configurator_ux/    # EXISTS — configurator UX layer (pre-Module 0 work)
+│   ├── southbrook_mrp_pm/             # EXISTS — MRP project-management dashboard (pre-Module 0 work)
+│   ├── southbrook_plm/                # Module 1 — DELIVERED + LIVE on QNAP southbrook stack 2026-05-31 (14/14 tests; see southbrook_plm_deploy memory)
+│   ├── southbrook_freecad_bridge/     # Module 2 (Odoo side of the bridge) — TO BUILD
+│   ├── southbrook_hardware_catalog/   # Module 3 — TO BUILD
+│   ├── southbrook_kitchen_mrp/        # Module 4 (sb.cutlist, sb.hardware.package) — TO BUILD
+│   ├── southbrook_kitchen_workspace/  # Module 5 (sb.kitchen.project ...) — TO BUILD
+│   ├── southbrook_ai_design/          # Module 6 (Gemini caller, JSON contract) — TO BUILD
+│   ├── southbrook_config_engine/      # Module 7 (cabinet placement rules engine) — TO BUILD
+│   ├── southbrook_customer_portal/    # Module 8 (extends Phase 1.6 portal) — TO BUILD
+│   └── southbrook_dealer_portal/      # Module 9 (dealer 50% pricing, KD program) — TO BUILD
 │
 ├── services/
 │   └── freecad_bridge/                # FastAPI microservice (the only FreeCAD dependency)
@@ -125,12 +134,23 @@ southbrook-platform/
 Build **strictly in this order**. Each module ends with a gate (Discipline C). Dependencies are explicit — do not start a module whose dependency has failing tests.
 
 ### Module 0 — Repository skeleton + Docker (no business logic)
-- `docker-compose.yml`: `odoo` (19 CE), `db` (postgres:16), `freecad-bridge` (placeholder build).
+**Note (2026-06-09):** the monorepo `~/southbrook-v19cr/` already exists with the four OCA configurator addons + foundation `southbrook_estimating` + delivered `southbrook_plm` + three additional pre-Module-0 custom addons. Module 0 is therefore **additive**: create only the new top-level files/dirs listed below, do not touch existing addons, do not rename the repo root.
+- `docker-compose.yml`: `odoo` (19 CE), `db` (postgres:16), `freecad-bridge` (placeholder build). Volume-mount the existing `addons/` directly.
 - `.env.example` with `FREECAD_BRIDGE_SECRET`, `ODOO_DB`, `GEMINI_API_KEY` placeholders.
 - `shared/southbrook_dims.py` — implement the 7 canonical panel formulas (Side, Top, Bottom, Back, Adjustable Shelf, Toe Kick, Door Face) as the authoritative dimension source for FreeCAD, Three.js, and the BoM-contents assertions. **Peter Tuschak signed off these formulas 2026-06-09 (G2 closed). Treat them as final. Do NOT add provisional / TODO / SIGN-OFF-REQUIRED markers.**
-- **DoD:** `docker compose up` brings Odoo to the login page; `southbrook_estimating` loads without error; bridge container builds and answers `GET /health`.
+- `services/freecad_bridge/` skeleton (Dockerfile + `main.py` `/health` only — full surface lands in Module 2).
+- `docs/api_contracts/` empty dir + README placeholder.
+- **DoD:** `docker compose up` brings Odoo to the login page; `southbrook_estimating` loads without error; bridge container builds and answers `GET /health`. (Requires OrbStack daemon running + Node.js installed.)
 
-### Module 1 — `southbrook_plm`
+### Module 1 — `southbrook_plm`   **— DELIVERED + LIVE (2026-05-31, status 2026-06-09)**
+- **Status:** Built, tested (14/14 passing), deployed to the QNAP southbrook stack 2026-05-31, public source at `github.com/dangelojohn/PLM-v19`. The "5-minute OmniaSolutions check" gate was executed during build and is closed (see PLM-v19 `docs/PLM-Gap-Fit-Analysis.md`).
+- **Skip the build instructions below.** They are retained as a historical contract for what this module guarantees so downstream modules (2, 3, 4) can program against it.
+- **Verify before relying on:** `ls addons/southbrook_plm/` + `docker exec southbrook-odoo odoo-bin … --test-tags southbrook_plm` (apply Discipline D).
+- **Cut-spec seam (important for Module 2):** `southbrook_plm` overrides `southbrook_estimating/models/mrp_bom.py::_get_cut_constants()` to read the active `southbrook.cut.spec`. Module 2's bridge must respect this — never call the estimating-level constants directly.
+- **Outstanding scope vs. what was built:** the deployed module covers ECO + cut-spec; the FreeCAD-attachment surface described below was deferred to Module 2 (it adds `x_cad_status` / `x_cad_attachment_ids` to `mrp.production`). Module 2 absorbs that work.
+
+<details><summary>Original Module 1 build spec (historical — module already exists; for reference only)</summary>
+
 - **Depends on:** `mrp`, `product`, `mail`, `southbrook_estimating`.
 - **Gate before starting:** run a 5-minute check on `github.com/OmniaSolutions/odoo-plm` for a stable 19.0 branch. If one exists and covers ECO + BoM revision, adopt it and layer FreeCAD fields on top instead of building from scratch. Report the decision.
 - **Models:** `plm.document`, `plm.eco`, `plm.eco.line`, `plm.bom.revision`. Add `x_cad_status`, `x_cad_attachment_ids`, `x_plm_eco_id` to `mrp.production` via `_inherit`.
@@ -140,6 +160,7 @@ Build **strictly in this order**. Each module ends with a gate (Discipline C). D
 - **Views:** ECO form with status bar, colour-coded `plm.eco.line` (removals red, additions green, modifications amber), CAD Files tab, Approvals tab, chatter.
 - **Tests:** `test_plm_eco.py` (state transitions, snapshot creation, version bump). Smoke test for every stub.
 - **DoD:** all tests green; ECO lifecycle demonstrable end-to-end on the local clone.
+</details>
 
 ### Module 2 — `southbrook_freecad_bridge` (Odoo side) + the FreeCAD service
 - **Depends on:** `southbrook_plm`, `mrp`.
